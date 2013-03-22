@@ -34,7 +34,7 @@ int main ()
       return 1;
    }
 
-   /*
+   //*
    int conectionSocket;
    conectionSocket = accept (mySocket, NULL, NULL);
 
@@ -47,7 +47,7 @@ int main ()
 
    ////////////////
    // больш складаны варыянт, які атрымлівае адрас кліента
-   ///*
+   /*
    int conectionSocket;
    struct sockaddr_in clientAddress;
    int sizeClientAddress;

@@ -29,7 +29,7 @@ int main ()
       return 1;
    }
 
-   //*
+   /*
    printf("local ip %s\n",inet_ntoa(myAddress.sin_addr));
    printf("local port %d\n",htons(myAddress.sin_port));
    printf("local domain(family) %s\n\n",(myAddress.sin_family==AF_INET?"AF_INET":"others"));
