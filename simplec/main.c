@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 
-int main ()
+int main (int argc, char **argv)
 {
    int mySocket;
 
@@ -19,7 +19,10 @@ int main ()
    struct sockaddr_in myAddress;
    myAddress.sin_family = AF_INET;
    myAddress.sin_port = htons (7500);
-   myAddress.sin_addr.s_addr = inet_addr ("127.0.0.1");
+   if(argc==1)
+      myAddress.sin_addr.s_addr = inet_addr ("127.0.0.1");
+   else
+      myAddress.sin_addr.s_addr = inet_addr (argv[1]);
 
    ok = connect (mySocket, (struct sockaddr *) &myAddress, sizeof (myAddress));
 
@@ -35,7 +38,9 @@ int main ()
    printf("local domain(family) %s\n\n",(myAddress.sin_family==AF_INET?"AF_INET":"others"));
    //*/
 
-   ok = send (mySocket, "kuku\0", 5, 0);
+
+   int len=5;
+   ok = send (mySocket, "kuku\0", len, 0);
 
    if (ok <= 0)
    {
@@ -43,9 +48,11 @@ int main ()
       return 1;
    }
 
-   char buf[ 5 ] ;
 
-   ok = recv (mySocket, buf, 5, 0) ;
+
+   char buf[ len ] ;
+
+   ok = recv (mySocket, buf, len, 0) ;
 
    if (ok <= 0)
    {
@@ -54,8 +61,6 @@ int main ()
    }
    else
       printf ("%s\n", buf);
-
    return 0;
 
 }
-
