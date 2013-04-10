@@ -14,6 +14,7 @@ using namespace std;
 using namespace hzw;
 
 enum State {FINISH, START, NORMAL, CONTROL, DISCONNECT, ENDING};
+enum Direction {NEUTRAL, HIN, HER};
 
 char catchChar();
 
@@ -56,7 +57,7 @@ int main(int argc, char **argv)
       }*/
 
       Queue<char> qInput, qSend, qRecipe, qOutput, qChecked;
-      bool silentWindow[2] = {true, true};
+      Direction directionWindow[2] = {NEUTRAL, NEUTRAL};
       char ch;
       char controlWord[20] = "";
       State state = NORMAL;
@@ -65,15 +66,23 @@ int main(int argc, char **argv)
       do
       {
          system("sleep 0.01");
-         //console input
 
+         //console input
          if(NORMAL == state || CONTROL == state)
          {
             ch = catchChar();
 
             if(ch != EOF)
             {
+               if(HIN != directionWindow[0] && HIN == directionWindow[1])
+               {
+                  putchar('\n');
+                  putchar('>');
+               }
+
                qInput.enqueue(ch);
+               directionWindow[0] = directionWindow[1];
+               directionWindow[1] = HIN;
             }
          }
 
@@ -177,7 +186,27 @@ int main(int argc, char **argv)
 
             if('\x04' == ch)
                state = ENDING;
+            else if('\x10' != ch)
+            {
+               qOutput.enqueue(ch);
+               directionWindow[0] = directionWindow[1];
+               directionWindow[1] = HER;
+            }
          }
+
+         if(NORMAL == state || ENDING == state)
+            if(!qOutput.isEmpty())
+            {
+               if(HER != directionWindow[0] && HER == directionWindow[1])
+               {
+                  putchar('\n');
+                  putchar('<');
+               }
+               putchar(qOutput.onFront());
+               qOutput.dequeue();
+            }
+
+
 
          //ending close
          if(ENDING == state)
@@ -241,6 +270,7 @@ char catchChar()
    fcntl(STDIN_FILENO, F_SETFL, oldConsoleFlag);
    return ch;
 }
+
 
 
 
