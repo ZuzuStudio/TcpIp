@@ -8,135 +8,188 @@
 #include <cstdio>
 #include <cstring>
 #include <hzw/queue.h>
+#include "tcpexception.h"
 
 using namespace std;
 using namespace hzw;
 
-enum State { FINISH, START, NORMAL, CONTROL, DISCONNECT, ENDING};
+enum State {FINISH, START, NORMAL, CONTROL, DISCONNECT, ENDING};
 
 char catchChar();
 
 int main(int argc, char **argv)
 {
-   /* int mySocket;
-
-    mySocket = socket(AF_INET, SOCK_STREAM, 0);
-
-    if(mySocket < 0)
-    {
-       cerr << "ошибка вызова socket\n";
-       return 1;
-    }
-
-    int bad;
-    struct sockaddr_in myAddress;
-    myAddress.sin_family = AF_INET;
-    myAddress.sin_port = htons(7500);
-
-    if(argc == 1)
-       myAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
-    else
-       myAddress.sin_addr.s_addr = inet_addr(argv[1]);
-
-    bad = connect(mySocket, (struct sockaddr *) &myAddress, sizeof(myAddress));
-
-    if(bad)
-    {
-       cerr << "ошибка вызова connect\n";
-       return 1;
-    }*/
+   int sendFile, recvFile;
 
    try
    {
+      int mySocket;
+
+      mySocket = socket(AF_INET, SOCK_STREAM, 0);
+
+      if(mySocket < 0)
+         throw ExceptionSocket();
+
+
+
+      sendFile = open("send.eml", O_WRONLY | O_CREAT | O_TRUNC, 0664);
+      recvFile = open("recv.eml", O_RDONLY);
+
+      /*
+
+      int bad;
+      struct sockaddr_in myAddress;
+      myAddress.sin_family = AF_INET;
+      myAddress.sin_port = htons(7500);
+
+      if(argc == 1)
+         myAddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+      else
+         myAddress.sin_addr.s_addr = inet_addr(argv[1]);
+
+      bad = connect(mySocket, (struct sockaddr *) &myAddress, sizeof(myAddress));
+
+      if(bad)
+      {
+         cerr << "ошибка вызова connect\n";
+         return 1;
+      }*/
+
       Queue<char> qInput, qSend, qRecipe, qOutput, qChecked;
       bool silentWindow[2] = {true, true};
       char ch;
       char controlWord[20] = "";
-      State state = FINISH;
+      State state = NORMAL;
+      int downcounter = 50;
 
       do
       {
-
+         system("sleep 0.01");
          //console input
-         ch = catchChar();
 
-         if(ch != EOF)
+         if(NORMAL == state || CONTROL == state)
          {
-            qInput.enqueue(ch);
+            ch = catchChar();
+
+            if(ch != EOF)
+            {
+               qInput.enqueue(ch);
+            }
          }
 
          //qInput
-         if(!qInput.isEmpty())
-            if('/' == qInput.onFront())
-               state = CONTROL;// TO control state
-            else
+         if(NORMAL == state)
+         {
+            int combine = (qInput.isEmpty() ? 0 : 1) + (qChecked.isEmpty() ? 0 : 2);
+
+            switch(combine)
             {
-               if(!qChecked.isEmpty())
-               {
+               case 3:
+               case 2:
                   qSend.enqueue(qChecked.onFront());
                   qChecked.dequeue();
+                  break;
+               case 1:
+
+                  if('/' == qInput.onFront())
+                     state = CONTROL;// TO control state
+                  else
+                  {
+                     qSend.enqueue(qInput.onFront());
+                     qInput.dequeue();
+                  }
+
+                  break;
+               case 0:
+                  break;
+            }
+         }
+
+         //qChecked
+         if(CONTROL == state)
+            if(!qInput.isEmpty())
+            {
+               char smallString[2] = {'\0', '\0'};
+               smallString[0] = qInput.onFront();
+               qChecked.enqueue(qInput.onFront());
+               qInput.dequeue();
+               strcat(controlWord, smallString);
+
+               if(!strcmp(smallString, "/exit"))
+               {
+                  state = DISCONNECT;
+                  qChecked.clear();
+                  strcpy(controlWord, "");
                }
                else
                {
-                  qSend.enqueue(qInput.onFront());
-                  qInput.dequeue();
+                  if(strlen(controlWord) > 7)
+                  {
+                     state = NORMAL;
+                     strcpy(controlWord, "");
+                  }
                }
-
             }
 
-         //qChecked
-         if(!qInput.isEmpty())
-         {
-            char smallString[2] = {'\0', '\0'};
-            smallString[0] = qInput.onFront();
-            qChecked.enqueue(qInput.onFront());
-            qInput.dequeue();
-            strcat(controlWord, smallString);
-
-            if(!strcmp(smallString, "/exit"))
+         //qSend normall
+         if(NORMAL == state || ENDING == state)
+            if(!qSend.isEmpty())
             {
-               state = DISCONNECT;
-               qChecked.clear();
-               strcpy(controlWord, "");
+               ch = qSend.onFront();
+               qSend.dequeue();
+
+               if(write(sendFile, (const void *) &ch, 1) <= 0)
+                  throw ExceptionSend();
+
+               //if(send(mySocket, (const void *) &ch, 1, 0) <= 0)
+               //   throw ExceptionSend();
+
+
             }
             else
             {
-               if(strlen(controlWord) > 7)
-               {
-                  state = NORMAL;
-                  strcpy(controlWord, "");
-               }
-            }
-         }
+               ch = '\x10';
 
-         //qSend normall
-         if(!qSend.isEmpty())
+               if(write(sendFile, (const void *) &ch, 1) <= 0)
+                  throw ExceptionSend();
+
+               //if(send(mySocket, (const void *) &ch, 1, 0) <= 0)
+               //   throw ExceptionSend();
+            }
+
+         if(DISCONNECT == state)
          {
-            int bad = send(mySocket, qSend.onFront(), 1, 0);
+            ch = '\x04';
 
-            if(bad <= 0)
-            {
-               perror("ошибка вызова send\n");
-               return 1;
-            }
+            if(write(sendFile, (const void *) &ch, 1) <= 0)
+               throw ExceptionSend();
 
-            qSend.dequeue();
+            //if(send(mySocket, (const void *) &ch, 1, 0) <= 0)
+            //   throw ExceptionSend();
+            state = ENDING;
          }
-         else
+
+         //normal recive
+         if(NORMAL == state)
          {
-            int bad = send(mySocket, '\16', 1, 0);
+            if(read(recvFile, (void *) &ch, 1) <= 0)
+               throw ExceptionRecive();
 
-            if(bad <= 0)
-            {
-               perror("ошибка вызова send\n");
-               return 1;
-            }
+            if('\x04' == ch)
+               state = ENDING;
          }
 
+         //ending close
+         if(ENDING == state)
+            if(qSend.isEmpty() && qOutput.isEmpty())
+               if(downcounter)
+                  --downcounter;
+               else
+                  state = FINISH;
+            else
+               downcounter = 50;
       }
       while(state);
-
-
    }
    catch(exception &e)
    {
@@ -188,6 +241,11 @@ char catchChar()
    fcntl(STDIN_FILENO, F_SETFL, oldConsoleFlag);
    return ch;
 }
+
+
+
+
+
 
 
 
